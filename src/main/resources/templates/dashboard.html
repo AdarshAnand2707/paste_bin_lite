@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dashboard - PasteBin Lite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+        }
+        .header .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .header .username {
+            font-weight: 600;
+            color: #333;
+        }
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        .nav-links a {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        .nav-links a.secondary {
+            background: #6c757d;
+        }
+        .nav-links a.secondary:hover {
+            background: #5a6268;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .paste-list {
+            display: grid;
+            gap: 15px;
+        }
+        .paste-item {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s;
+        }
+        .paste-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        .paste-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .paste-id {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .paste-visibility {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .paste-visibility.public {
+            background: #d4edda;
+            color: #155724;
+        }
+        .paste-visibility.private {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .paste-content {
+            color: #6c757d;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: pre-wrap;
+        }
+        .paste-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: #6c757d;
+        }
+        .paste-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .paste-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .paste-actions a {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .paste-actions a:hover {
+            background: #5568d3;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        .shared-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e7f3ff;
+            color: #004085;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 My Dashboard</h1>
+            <div class="user-info">
+                <span class="username" th:text="${username}"></span>
+                <div class="nav-links">
+                    <a th:href="@{/}">Create Paste</a>
+                    <a th:href="@{/logout}" class="secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- My Pastes Section -->
+        <div class="section">
+            <h2>📝 My Pastes (<span th:text="${#lists.size(ownedPastes)}">0</span>)</h2>
+            <div class="paste-list" th:if="${!#lists.isEmpty(ownedPastes)}">
+                <div class="paste-item" th:each="paste : ${ownedPastes}">
+                    <div class="paste-header">
+                        <span class="paste-id" th:text="${paste.id}"></span>
+                        <span class="paste-visibility"
+                              th:classappend="${paste.visibility.name() == 'PUBLIC'} ? 'public' : 'private'"
+                              th:text="${paste.visibility.name()}"></span>
+                    </div>
+                    <div class="paste-content" th:text="${#strings.abbreviate(paste.content, 200)}"></div>
+                    <div class="paste-meta">
+                        <span>📅 Created: <span th:text="${#temporals.format(paste.createdAt, 'MMM dd, yyyy HH:mm')}"></span></span>
+                        <span th:if="${paste.expiresAt != null}">⏰ Expires: <span th:text="${#temporals.format(paste.expiresAt, 'MMM dd, yyyy HH:mm')}"></span></span>
+                        <span th:if="${paste.maxViews != null}">👁️ Views: <span th:text="${paste.viewCount + ' / ' + paste.maxViews}"></span></span>
+                        <span th:if="${paste.maxViews == null}">👁️ Views: <span th:text="${paste.viewCount}"></span></span>
+                        <span th:if="${paste.visibility.name() == 'PRIVATE' && !#lists.isEmpty(paste.sharedWith)}">
+                            🔗 Shared with <span th:text="${#lists.size(paste.sharedWith)}"></span> user(s)
+                        </span>
+                    </div>
+                    <div class="paste-actions">
+                        <a th:href="@{'/p/' + ${paste.id}}" target="_blank">View</a>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(ownedPastes)}">
+                <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                </svg>
+                <p>You haven't created any pastes yet.</p>
+                <p style="margin-top: 10px;"><a th:href="@{/}" style="color: #667eea; text-decoration: none; font-weight: 600;">Create your first paste →</a></p>
+            </div>
+        </div>
+
+        <!-- Shared with Me Section -->
+        <div class="section">
+            <h2>🔗 Shared with Me (<span th:text="${#lists.size(sharedPastes)}">0</span>)</h2>
+            <div class="paste-list" th:if="${!#lists.isEmpty(sharedPastes)}">
+                <div class="paste-item" th:each="paste : ${sharedPastes}">
+                    <div class="paste-header">
+                        <span class="paste-id" th:text="${paste.id}"></span>
+                        <span class="shared-badge">
+                            Shared by: <span th:text="${paste.owner != null ? paste.owner.username : 'Unknown'}"></span>
+                        </span>
+                    </div>
+                    <div class="paste-content" th:text="${#strings.abbreviate(paste.content, 200)}"></div>
+                    <div class="paste-meta">
+                        <span>📅 Created: <span th:text="${#temporals.format(paste.createdAt, 'MMM dd, yyyy HH:mm')}"></span></span>
+                        <span th:if="${paste.expiresAt != null}">⏰ Expires: <span th:text="${#temporals.format(paste.expiresAt, 'MMM dd, yyyy HH:mm')}"></span></span>
+                        <span th:if="${paste.maxViews != null}">👁️ Views: <span th:text="${paste.viewCount + ' / ' + paste.maxViews}"></span></span>
+                        <span th:if="${paste.maxViews == null}">👁️ Views: <span th:text="${paste.viewCount}"></span></span>
+                    </div>
+                    <div class="paste-actions">
+                        <a th:href="@{'/p/' + ${paste.id}}" target="_blank">View</a>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" th:if="${#lists.isEmpty(sharedPastes)}">
+                <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                </svg>
+                <p>No pastes have been shared with you yet.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

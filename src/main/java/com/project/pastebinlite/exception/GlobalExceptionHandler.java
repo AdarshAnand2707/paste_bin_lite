@@ -2,6 +2,7 @@ package com.project.pastebinlite.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -47,10 +48,20 @@ public class GlobalExceptionHandler {
 		errorResponse.put("status", HttpStatus.NOT_FOUND.value());
 		errorResponse.put("error", "Not Found");
 		errorResponse.put("message", ex.getMessage());
-		
+
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
 	}
-	
+
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
+		Map<String, Object> errorResponse = new HashMap<>();
+		errorResponse.put("status", HttpStatus.FORBIDDEN.value());
+		errorResponse.put("error", "Forbidden");
+		errorResponse.put("message", ex.getMessage());
+
+		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
 		Map<String, Object> errorResponse = new HashMap<>();

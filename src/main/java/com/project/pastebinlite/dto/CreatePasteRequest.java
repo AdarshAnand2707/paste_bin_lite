@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class CreatePasteRequest {
 
@@ -20,4 +22,9 @@ public class CreatePasteRequest {
 	@JsonProperty("max_views")
 	@Min(value = 1, message = "max_views must be at least 1")
 	private Integer maxViews;
+
+	private String visibility; // "PUBLIC" or "PRIVATE"
+
+	@JsonProperty("shared_with")
+	private List<String> sharedUsernames; // List of usernames to share with
 }

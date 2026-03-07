@@ -175,10 +175,60 @@
             opacity: 0.8;
             font-size: 14px;
         }
+        .auth-bar {
+            text-align: right;
+            padding: 10px 0;
+            margin-bottom: 20px;
+        }
+        .auth-bar a, .auth-bar span {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+            font-weight: 500;
+        }
+        .auth-bar a:hover {
+            text-decoration: underline;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            background: white;
+        }
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        select[multiple] {
+            min-height: 120px;
+        }
+        .visibility-note {
+            padding: 10px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #856404;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="auth-bar">
+            <span th:if="${isAuthenticated}">
+                Welcome, <strong th:text="${username}"></strong>!
+                <a th:href="@{/dashboard}">Dashboard</a>
+                <a th:href="@{/logout}">Logout</a>
+            </span>
+            <span th:unless="${isAuthenticated}">
+                <a th:href="@{/login}">Login</a>
+                <a th:href="@{/register}">Register</a>
+            </span>
+        </div>
         <div class="header">
             <h1>
                 <svg fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
@@ -206,29 +256,50 @@
                 <div class="options-grid">
                     <div class="form-group">
                         <label for="ttl_seconds">Expiration (seconds)</label>
-                        <input 
-                            type="number" 
-                            id="ttl_seconds" 
-                            name="ttl_seconds" 
+                        <input
+                            type="number"
+                            id="ttl_seconds"
+                            name="ttl_seconds"
                             min="1"
                             placeholder="Optional"
                         >
                         <div class="hint">Leave empty for no expiration</div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="max_views">Maximum Views</label>
-                        <input 
-                            type="number" 
-                            id="max_views" 
-                            name="max_views" 
+                        <input
+                            type="number"
+                            id="max_views"
+                            name="max_views"
                             min="1"
                             placeholder="Optional"
                         >
                         <div class="hint">Leave empty for unlimited views</div>
                     </div>
                 </div>
-                
+
+                <div th:if="${isAuthenticated}">
+                    <div class="form-group">
+                        <label for="visibility">Visibility</label>
+                        <select id="visibility" name="visibility">
+                            <option value="PUBLIC">Public (Anyone with link can view)</option>
+                            <option value="PRIVATE">Private (Only shared users can view)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="shareSection" style="display:none;">
+                        <label for="shared_with">Share with Users</label>
+                        <select id="shared_with" name="shared_with" multiple>
+                            <option th:each="user : ${users}" th:value="${user.username}" th:text="${user.username}"></option>
+                        </select>
+                        <div class="hint">Hold Ctrl (Cmd on Mac) to select multiple users</div>
+                        <div class="visibility-note">
+                            Only selected users will be able to view this private paste.
+                        </div>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn" id="submitBtn">
                     Create Paste
                 </button>
@@ -255,29 +326,54 @@
     </div>
     
     <script>
+        // Toggle share section based on visibility selection
+        const visibilitySelect = document.getElementById('visibility');
+        const shareSection = document.getElementById('shareSection');
+
+        if (visibilitySelect) {
+            visibilitySelect.addEventListener('change', (e) => {
+                if (e.target.value === 'PRIVATE') {
+                    shareSection.style.display = 'block';
+                } else {
+                    shareSection.style.display = 'none';
+                }
+            });
+        }
+
         document.getElementById('pasteForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const submitBtn = document.getElementById('submitBtn');
             const result = document.getElementById('result');
             const error = document.getElementById('error');
-            
+
             // Reset states
             result.classList.remove('success');
             error.classList.remove('error');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating...';
-            
+
             const formData = {
                 content: document.getElementById('content').value,
             };
-            
+
             const ttl = document.getElementById('ttl_seconds').value;
             const maxViews = document.getElementById('max_views').value;
-            
+            const visibility = document.getElementById('visibility');
+            const sharedWith = document.getElementById('shared_with');
+
             if (ttl) formData.ttl_seconds = parseInt(ttl);
             if (maxViews) formData.max_views = parseInt(maxViews);
-            
+            if (visibility) formData.visibility = visibility.value;
+
+            // Add shared users if private
+            if (visibility && visibility.value === 'PRIVATE' && sharedWith) {
+                const selectedUsers = Array.from(sharedWith.selectedOptions).map(opt => opt.value);
+                if (selectedUsers.length > 0) {
+                    formData.shared_with = selectedUsers;
+                }
+            }
+
             try {
                 const response = await fetch('/api/pastes', {
                     method: 'POST',
@@ -286,15 +382,16 @@
                     },
                     body: JSON.stringify(formData)
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     document.getElementById('pasteUrl').value = data.url;
                     result.classList.add('success');
                     document.getElementById('pasteForm').reset();
+                    if (shareSection) shareSection.style.display = 'none';
                 } else {
-                    const errorMsg = data.errors 
+                    const errorMsg = data.errors
                         ? Object.values(data.errors).join(', ')
                         : data.message || 'Failed to create paste';
                     document.getElementById('errorMessage').textContent = errorMsg;
@@ -308,7 +405,7 @@
                 submitBtn.textContent = 'Create Paste';
             }
         });
-        
+
         function copyUrl() {
             const urlInput = document.getElementById('pasteUrl');
             urlInput.select();
