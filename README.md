@@ -4,6 +4,10 @@ A lightweight, fast, and secure pastebin service built with Spring Boot. Share t
 
 ## Features
 
+- **User Authentication**: Register and login with secure password hashing
+- **Public & Private Pastes**: Control visibility of your pastes
+- **Paste Sharing**: Share private pastes with specific users
+- **User Dashboard**: View all your pastes and pastes shared with you
 - Create and share text pastes instantly
 - Optional time-based expiration (TTL in seconds)
 - Optional view-based expiration (maximum views limit)
@@ -17,6 +21,7 @@ A lightweight, fast, and secure pastebin service built with Spring Boot. Share t
 - **Backend**: Spring Boot 4.0.1, Java 17
 - **Database**: MySQL 8.x
 - **ORM**: Spring Data JPA / Hibernate
+- **Security**: Spring Security with BCrypt password hashing
 - **Validation**: Jakarta Bean Validation
 - **Template Engine**: Thymeleaf
 - **Build Tool**: Maven
@@ -75,8 +80,73 @@ The application will start on `http://localhost:8080`
 ### 5. Access the Application
 
 - **Web Interface**: http://localhost:8080
+- **User Registration**: http://localhost:8080/register
+- **User Login**: http://localhost:8080/login
+- **User Dashboard**: http://localhost:8080/dashboard (requires login)
 - **Health Check**: http://localhost:8080/api/healthz
 - **Actuator**: http://localhost:8080/actuator/health
+
+## Quick Start Guide
+
+### Create Your First Paste (Anonymous)
+
+1. Visit http://localhost:8080
+2. Enter text in the content area
+3. (Optional) Set expiration time or view limit
+4. Click "Create Paste"
+5. Share the generated URL
+
+### Create a Private Paste (Authenticated)
+
+1. Register at http://localhost:8080/register
+2. Log in at http://localhost:8080/login
+3. Visit the home page
+4. Enter your content
+5. Select "PRIVATE" visibility
+6. Choose users to share with from the dropdown
+7. Click "Create Paste"
+8. Only you and selected users can access the paste
+
+### View Your Pastes
+
+1. Log in to your account
+2. Visit http://localhost:8080/dashboard
+3. See all your created pastes under "My Pastes"
+4. See pastes shared with you under "Shared with Me"
+
+## User Authentication
+
+### Anonymous vs Authenticated Usage
+
+**Without Login** (Anonymous):
+- Create public pastes
+- View any public paste
+- Cannot create private pastes
+- No dashboard access
+
+**With Login** (Authenticated):
+- Create public or private pastes
+- Share private pastes with specific users
+- View personal dashboard with owned and shared pastes
+- Full access control over paste visibility
+
+### Register a New User
+
+Users can register via the web interface at `/register`.
+
+**Web**: Navigate to http://localhost:8080/register and fill in:
+- Username (unique)
+- Email (unique)
+- Password (will be BCrypt hashed)
+
+### Login
+
+**Web**: Navigate to http://localhost:8080/login
+
+Authentication is session-based. Once logged in, users can:
+- Create public or private pastes
+- Share private pastes with specific users
+- View their dashboard with all owned and shared pastes
 
 ## API Endpoints
 
@@ -89,9 +159,18 @@ Content-Type: application/json
 {
   "content": "Your text here",
   "ttl_seconds": 3600,
-  "max_views": 10
+  "max_views": 10,
+  "visibility": "PUBLIC",
+  "sharedWith": ["username1", "username2"]
 }
 ```
+
+**Parameters**:
+- `content` (required): The paste content
+- `ttl_seconds` (optional): Time-to-live in seconds
+- `max_views` (optional): Maximum number of views before expiration
+- `visibility` (optional): "PUBLIC" or "PRIVATE" (default: PUBLIC, requires login for PRIVATE)
+- `sharedWith` (optional): Array of usernames to share with (only for PRIVATE pastes)
 
 **Response**:
 ```json
@@ -100,6 +179,10 @@ Content-Type: application/json
   "url": "http://localhost:8080/p/abc123xyz"
 }
 ```
+
+**Notes**:
+- Public pastes can be created by anyone (logged in or anonymous)
+- Private pastes require authentication and can only be viewed by the owner and users in the `sharedWith` list
 
 ### View a Paste (API)
 
@@ -124,6 +207,46 @@ GET /p/{id}
 
 Returns HTML page with the paste content.
 
+## User Dashboard
+
+Authenticated users can access their dashboard at `/dashboard` to:
+
+### My Pastes
+- View all pastes they've created
+- See visibility status (PUBLIC/PRIVATE)
+- Check expiration times and view counts
+- See how many users each private paste is shared with
+- Direct links to view each paste
+
+### Shared with Me
+- View all private pastes shared with them
+- See who owns/shared each paste
+- Access paste metadata (creation date, expiration, views)
+- Direct links to view shared pastes
+
+**Access**: Navigate to http://localhost:8080/dashboard (requires authentication)
+
+## Private Paste Sharing
+
+### How It Works
+
+1. **Create an Account**: Register and log in at `/register` and `/login`
+2. **Create a Private Paste**:
+   - Select "PRIVATE" visibility when creating a paste
+   - Choose users to share with from the dropdown (multi-select)
+3. **Access Control**:
+   - Only the owner and selected users can view the paste
+   - Attempting to access without permission returns 403 Forbidden
+4. **Share Management**:
+   - Sharing is set at paste creation time
+   - Shared users are associated via the `paste_shares` join table
+
+### Use Cases
+
+- Share sensitive information with specific team members
+- Collaborate on code snippets with selected users
+- Control access to confidential notes or configurations
+
 ## Persistence Layer
 
 ### Database: MySQL
@@ -137,6 +260,16 @@ The application uses **MySQL 8.x** as the persistence layer with the following c
 
 ### Entity Model
 
+#### User Entity
+The `User` entity includes:
+- `id` (String, UUID): Auto-generated unique identifier
+- `username` (String, unique): User's login name
+- `email` (String, unique): User's email address
+- `password` (String): BCrypt hashed password
+- `enabled` (Boolean): Account status
+- `createdAt` (LocalDateTime): Account creation timestamp
+
+#### Paste Entity
 The `Paste` entity includes:
 - `id` (String, UUID): Auto-generated unique identifier
 - `content` (MEDIUMTEXT): Paste content (max 16MB)
@@ -144,23 +277,49 @@ The `Paste` entity includes:
 - `expiresAt` (LocalDateTime): Optional expiration timestamp
 - `maxViews` (Integer): Optional maximum view count
 - `viewCount` (Integer): Current view count
+- `owner` (User, FK): The user who created the paste (null for anonymous pastes)
+- `visibility` (Enum): PUBLIC or PRIVATE
+- `sharedWith` (Set<User>): Users with whom a PRIVATE paste is shared (many-to-many)
 
 ### Database Schema
 
-Tables are automatically created and updated by Hibernate. The main table structure:
+Tables are automatically created and updated by Hibernate. The main table structures:
 
 ```sql
+-- Users table
+CREATE TABLE users (
+    id VARCHAR(255) PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at DATETIME NOT NULL
+);
+
+-- Pastes table
 CREATE TABLE paste (
     id VARCHAR(255) PRIMARY KEY,
     content MEDIUMTEXT NOT NULL,
     created_at DATETIME NOT NULL,
     expires_at DATETIME,
     max_views INT,
-    view_count INT NOT NULL DEFAULT 0
+    view_count INT NOT NULL DEFAULT 0,
+    owner_id VARCHAR(255),
+    visibility VARCHAR(50) NOT NULL DEFAULT 'PUBLIC',
+    FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+
+-- Paste sharing join table (many-to-many)
+CREATE TABLE paste_shares (
+    paste_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    PRIMARY KEY (paste_id, user_id),
+    FOREIGN KEY (paste_id) REFERENCES paste(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 ```
 
-Indexes are automatically created on the primary key for fast lookups.
+Indexes are automatically created on primary keys and foreign keys for fast lookups.
 
 ## Configuration
 
@@ -232,7 +391,14 @@ The application provides consistent JSON error responses:
 
 ## Security
 
-- XSS protection via Thymeleaf's automatic HTML escaping
-- SQL injection prevention through JPA parameterized queries
-- Input validation with Jakarta Bean Validation
-- Content size limits (16MB maximum)
+- **Authentication**: Spring Security with session-based authentication
+- **Password Security**: BCrypt hashing with strength 10
+- **Access Control**:
+  - Public pastes accessible to anyone
+  - Private pastes restricted to owner and explicitly shared users
+  - Returns 403 Forbidden for unauthorized access attempts
+- **XSS Protection**: Thymeleaf's automatic HTML escaping
+- **SQL Injection Prevention**: JPA parameterized queries
+- **Input Validation**: Jakarta Bean Validation
+- **Content Size Limits**: 16MB maximum per paste
+- **CSRF Protection**: Enabled for web forms, disabled for REST API endpoints
